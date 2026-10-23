@@ -2,8 +2,8 @@ name: ChunkLock
 version: '${project.version}'
 main: com.chunklock.ChunkLockPlugin
 api-version: '1.20'
-description: Lightweight chunk claims and protection for Paper.
-authors: [ChunkLock]
+description: Claim chunks and protect player builds with configurable access rules.
+authors: [Demon888322]
 commands:
   chunk:
     description: Claim and manage the current chunk.

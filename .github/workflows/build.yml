@@ -2,16 +2,25 @@ name: Build and test
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
-    name: Java 21 / Paper API ${{ matrix.paper-api }}
+    name: Java 21 · Paper API ${{ matrix.paper-api }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -20,7 +29,7 @@ jobs:
           - 1.21.11-R0.1-SNAPSHOT
 
     steps:
-      - name: Check out source
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Java 21
@@ -30,5 +39,19 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build and test
-        run: mvn --batch-mode --no-transfer-progress -Dpaper.api.version=${{ matrix.paper-api }} clean verify
+      - name: Verify build and tests
+        run: >-
+          mvn
+          --batch-mode
+          --no-transfer-progress
+          -Dpaper.api.version=${{ matrix.paper-api }}
+          clean verify
+
+      - name: Publish plugin artifact
+        if: matrix.paper-api == '1.20.4-R0.1-SNAPSHOT' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChunkLock
+          path: target/ChunkLock.jar
+          if-no-files-found: error
+          retention-days: 14

@@ -7,11 +7,27 @@
     <artifactId>chunklock</artifactId>
     <version>1.0.0</version>
     <name>ChunkLock</name>
+    <description>A Paper plugin for chunk claims and player-build protection.</description>
+    <url>https://github.com/Demon888322/Chuncklock</url>
     <properties>
         <paper.api.version>1.20.4-R0.1-SNAPSHOT</paper.api.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+
+    <scm>
+        <connection>scm:git:https://github.com/Demon888322/Chuncklock.git</connection>
+        <developerConnection>scm:git:https://github.com/Demon888322/Chuncklock.git</developerConnection>
+        <url>https://github.com/Demon888322/Chuncklock</url>
+        <tag>HEAD</tag>
+    </scm>
+    <developers>
+        <developer>
+            <id>Demon888322</id>
+            <name>Demon888322</name>
+            <url>https://github.com/Demon888322</url>
+        </developer>
+    </developers>
 
     <repositories>
         <repository>
@@ -66,7 +82,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <release>21</release>
+                    <release>${maven.compiler.release}</release>
                 </configuration>
             </plugin>
             <plugin>

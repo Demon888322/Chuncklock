@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a reproducible ChunkLock problem.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Do not include passwords, tokens, player data, or other secrets.
+  - type: input
+    id: plugin-version
+    attributes:
+      label: ChunkLock version
+      description: Provide the plugin release or commit.
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: paper-version
+    attributes:
+      label: Paper version
+      description: Include the Paper build number if available.
+    validations:
+      required: true
+  - type: input
+    id: java-version
+    attributes:
+      label: Java version
+      placeholder: "21"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact actions or commands that trigger the problem.
+      placeholder: |
+        1. Claim a chunk with /chunk claim
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Remove secrets and personal data before submitting.
+      render: text

@@ -1,27 +1,36 @@
 storage:
+  # Use sqlite for local storage or mysql for a remote database.
   type: sqlite
   sqlite:
+    # Relative paths are resolved from the plugins/ChunkLock directory.
     file: claims.db
   mysql:
     host: localhost
     port: 3306
     database: chunklock
     username: chunklock
-    password: change-me
+    # Set this in the server configuration. Never publish database credentials.
+    password: ""
+    # Enable SSL when the MySQL server is configured for TLS.
     use-ssl: false
   pool:
+    # Maximum number of database connections in the pool.
     maximum-size: 4
+    # Maximum time to wait for a database connection, in milliseconds.
     connection-timeout-ms: 10000
 
 claims:
+  # Applied when a player has no matching permission-limit permission.
   default-limit: 8
-  # Players with the matching permission receive that claim limit.
+  # A matching permission grants the corresponding claim limit.
+  # When several permissions match, the highest configured limit is used.
   permission-limits:
     5: chunklock.limit.5
     20: chunklock.limit.20
     50: chunklock.limit.50
 
 visualizer:
+  # Minimum refresh interval is 5 ticks.
   interval-ticks: 20
+  # Distance between particles along the claim boundary, in blocks.
   spacing: 2.0
-

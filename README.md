@@ -2,50 +2,41 @@
 
 [![Build and test](https://github.com/Demon888322/Chuncklock/actions/workflows/build.yml/badge.svg)](https://github.com/Demon888322/Chuncklock/actions/workflows/build.yml)
 
-A Paper plugin for claiming chunks and protecting player builds. Manage access, tune protection rules per claim, and store claim data in SQLite or MySQL.
+**ChunkLock** is a Paper plugin for claiming chunks and protecting player builds. Players can manage trusted members, configure protection flags per claim, and view claim boundaries in game. Claim data is stored locally with SQLite by default, with MySQL available as an alternative.
 
-## Contents
-
-- [Features](#features)
-- [Requirements and compatibility](#requirements-and-compatibility)
-- [Installation](#installation)
-- [Commands](#commands)
-- [Permissions](#permissions)
-- [Configuration](#configuration)
-- [Build and test](#build-and-test)
-- [Contributing](#contributing)
+**Maintainer:** [Demon888322](https://github.com/Demon888322)
 
 ## Features
 
 - Claim, unclaim, and inspect the chunk you are standing in.
 - Grant and revoke trusted-player access to your claims.
-- Configure PvP, explosions, container access, redstone interaction, and natural mob spawning for each claim.
-- Preview claim boundaries with particles.
-- Use SQLite by default or configure a MySQL database.
-- Set default and permission-based claim limits.
+- Control PvP, explosions, container access, redstone interactions, and natural mob spawning per claim.
+- Preview claimed chunk boundaries with particles.
+- Store claims in SQLite or MySQL.
+- Set default claim limits and permission-based limit tiers.
 
 ## Requirements and compatibility
 
-| Requirement | Supported baseline |
+| Component | Requirement |
 | --- | --- |
 | Java runtime | Java 21 or newer |
-| Paper | 1.20.4 or newer |
-| Verified Paper API endpoints | 1.20.4 and 1.21.11 |
+| Paper server | 1.20.4 or newer |
+| API compatibility builds | Paper 1.20.4 and Paper 1.21.11 |
 
-The plugin compiles against Paper 1.20.4 by default to retain the oldest supported API baseline. GitHub Actions also builds and tests against Paper 1.21.11. Other releases between those API endpoints have not each been tested on a live server.
+The default build targets the Paper 1.20.4 API. Continuous integration also compiles and runs the automated tests against Paper 1.21.11. Intermediate releases are not individually tested on live servers; report any compatibility issues through [GitHub Issues](https://github.com/Demon888322/Chuncklock/issues).
 
 ## Installation
 
-1. Download or build `ChunkLock.jar` using the instructions in [Build and test](#build-and-test).
-2. Copy the JAR into your Paper server's `plugins` directory.
-3. Start the server. ChunkLock creates its default configuration and message files in `plugins/ChunkLock`.
-4. Stop the server, adjust configuration if needed, and restart it.
+1. Download `ChunkLock.jar` from a project release, or build it using the instructions below.
+2. Place the JAR in the server's `plugins` directory.
+3. Start the Paper server to generate `plugins/ChunkLock/config.yml` and `messages.yml`.
+4. Stop the server, edit the configuration if needed, and restart it.
 
-SQLite is the default and needs no separate database service. To use MySQL, set `storage.type` to `mysql` and configure the connection under `storage.mysql` in `config.yml`. Use a dedicated database account and keep its password private.
+SQLite is enabled by default and requires no separate database service. To use MySQL, set `storage.type` to `mysql` and configure `storage.mysql` in `config.yml`. Create a dedicated database account with only the permissions the plugin requires. Set credentials in the server's local configuration; never commit real secrets to source control.
 
 ## Commands
 
-Run player commands while standing in the chunk they apply to.
+Player commands apply to the chunk the player is currently standing in.
 
 | Command | Description |
 | --- | --- |
@@ -53,56 +44,71 @@ Run player commands while standing in the chunk they apply to.
 | `/chunk unclaim` | Remove your claim on the current chunk. |
 | `/chunk trust <player>` | Trust an online player in your current claim. |
 | `/chunk untrust <player>` | Remove a trusted player from your current claim. |
-| `/chunk flag <flag> <true\|false>` | Enable or disable a protection flag. |
-| `/chunk info` | Show the current claim's owner, members, and flags. |
+| `/chunk flag <flag> <true\|false>` | Configure a protection flag on your current claim. |
+| `/chunk info` | Show the current claim's owner, trusted members, and flags. |
 | `/chunk visualize` | Toggle claim-boundary particles. |
-| `/chunk admin unclaim` | Administratively unclaim the current chunk. |
+| `/chunk admin unclaim` | Administratively remove the current chunk's claim. |
 
-Available flags are `pvp`, `explosions`, `chest-access`, `redstone`, and `mob-spawning`. Flags default to `false`; setting a flag to `true` enables that action in the claim.
+### Claim flags
+
+All flags default to `false`. A flag set to `true` allows the corresponding action in the claim; trusted members retain their access.
+
+| Flag | When `true` |
+| --- | --- |
+| `pvp` | Allows player-versus-player damage in the claim. |
+| `explosions` | Allows explosions to affect blocks in the claim. |
+| `chest-access` | Allows untrusted players to access containers. Also accepts `containers` and `container-access` as command aliases. |
+| `redstone` | Allows untrusted players to use redstone controls. |
+| `mob-spawning` | Allows natural and chunk-generation mob spawning. |
 
 ## Permissions
 
-| Permission | Default | Description |
+| Permission | Default | Purpose |
 | --- | --- | --- |
 | `chunklock.claim` | Everyone | Claim and unclaim chunks; manage trusted members. |
 | `chunklock.flag` | Everyone | Change flags on claims you own. |
-| `chunklock.admin` | Operators | Administratively unclaim a chunk. |
-| `chunklock.limit.<number>` | Not granted by default | Assign a configured permission-based claim limit. |
+| `chunklock.admin` | Operators | Administratively unclaim the current chunk. |
+| `chunklock.limit.<number>` | Not granted | Apply the matching configured claim limit. |
 
-Set `claims.default-limit` for the standard claim limit. Use `claims.permission-limits` to associate configured limits with permission nodes.
+`claims.default-limit` sets the standard claim limit. The `claims.permission-limits` section maps limit values to permission nodes. When a player has multiple configured limit permissions, the highest matching limit is used.
 
 ## Configuration
 
-The generated `config.yml` includes settings for:
+The plugin generates `config.yml` with settings for:
 
 | Setting | Purpose |
 | --- | --- |
 | `storage.type` | Select `sqlite` or `mysql`. |
-| `storage.sqlite.file` | Set the SQLite database file path. |
-| `storage.mysql.*` | Configure the MySQL host, port, database, account, and SSL option. |
-| `storage.pool.*` | Configure the database connection pool. |
-| `claims.default-limit` | Set the default number of claims per player. |
-| `claims.permission-limits` | Map claim limits to permission nodes. |
-| `visualizer.*` | Configure particle interval and boundary spacing. |
+| `storage.sqlite.file` | SQLite database file; relative paths are resolved from the plugin data folder. |
+| `storage.mysql.*` | MySQL host, port, database, username, password, and SSL setting. |
+| `storage.pool.*` | Connection-pool size and connection timeout. |
+| `claims.default-limit` | Default claim limit. |
+| `claims.permission-limits` | Permission-based claim-limit tiers. |
+| `visualizer.interval-ticks` | Boundary-particle refresh interval, with a minimum of 5 ticks. |
+| `visualizer.spacing` | Distance between boundary particles, in blocks. |
 
 Customize player-facing text in `messages.yml`. Messages support MiniMessage formatting.
 
 ## Build and test
 
-Install a JDK 21 or newer and Maven, then run from the project root:
+Install JDK 21 or newer and Maven, then run these commands from the project root:
 
 ```shell
 mvn clean verify
 ```
 
-To compile and run tests against the newer Paper API endpoint:
+To run the same verification against Paper 1.21.11:
 
 ```shell
 mvn -Dpaper.api.version=1.21.11-R0.1-SNAPSHOT clean verify
 ```
 
-The shaded plugin JAR is created at `target/ChunkLock.jar`. The GitHub Actions workflow runs both Paper API variants on pull requests and pushes to `main`. Automated API/build checks do not replace testing on a live Paper server.
+The shaded plugin JAR is written to `target/ChunkLock.jar`. GitHub Actions runs both Paper API configurations for pushes and pull requests. These builds verify compilation and automated tests; they do not replace testing on a live Paper server.
 
 ## Contributing
 
-Bug reports and pull requests are welcome. When submitting a change, describe the player-facing behavior and include relevant test coverage. Run `mvn clean verify` before opening a pull request.
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and submission guidance. Review [SECURITY.md](SECURITY.md) to report a security concern privately.
+
+## License
+
+No license has been specified for this repository. Contact the maintainer before redistributing or reusing this project.
