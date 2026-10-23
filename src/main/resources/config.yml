@@ -20,14 +20,41 @@ storage:
     connection-timeout-ms: 10000
 
 claims:
-  # Applied when a player has no matching permission-limit permission.
-  default-limit: 8
+  # Applied when progression is disabled.
+  default-limit: 16
   # A matching permission grants the corresponding claim limit.
   # When several permissions match, the highest configured limit is used.
   permission-limits:
     5: chunklock.limit.5
     20: chunklock.limit.20
     50: chunklock.limit.50
+
+progression:
+  enabled: true
+  # Free claim slots granted to every player.
+  starting-claims: 16
+  # Hard cap for all claim slots, including permission-based limits.
+  maximum-claims: 100
+  tasks:
+    enabled: true
+    # Objective types rotate in this order: playtime, mined blocks, hostile mobs.
+    # Each completed cycle increases the objective target by the multiplier.
+    difficulty-multiplier: 1.5
+    playtime:
+      # Minutes connected to the server; idle time is included.
+      base-minutes: 15
+    blocks:
+      # Survival-mode blocks broken.
+      base-mined: 64
+    hostile-mobs:
+      # Hostile mobs defeated by the player in Survival mode.
+      base-defeated: 5
+  economy:
+    enabled: true
+    # Requires Vault and a compatible economy plugin. Tasks remain available without them.
+    cost-per-claim: 5000.0
+  # Persist task progress at this interval, in seconds.
+  save-interval-seconds: 60
 
 visualizer:
   # Minimum refresh interval is 5 ticks.

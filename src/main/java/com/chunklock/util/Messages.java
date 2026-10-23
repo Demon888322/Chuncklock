@@ -8,6 +8,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 public final class Messages {
@@ -17,7 +21,19 @@ public final class Messages {
 
     public Messages(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.messages = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "messages.yml"));
+        File file = new File(plugin.getDataFolder(), "messages.yml");
+        this.messages = YamlConfiguration.loadConfiguration(file);
+        try (InputStream defaults = plugin.getResource("messages.yml")) {
+            if (defaults == null) {
+                throw new IllegalStateException("Default messages.yml is missing from the plugin JAR.");
+            }
+            messages.setDefaults(YamlConfiguration.loadConfiguration(
+                    new InputStreamReader(defaults, StandardCharsets.UTF_8)));
+            messages.options().copyDefaults(true);
+            messages.save(file);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not update messages.yml with new default messages.", exception);
+        }
     }
 
     public void send(CommandSender sender, String key) {

@@ -4,10 +4,11 @@ main: com.chunklock.ChunkLockPlugin
 api-version: '1.20'
 description: Claim chunks and protect player builds with configurable access rules.
 authors: [Demon888322]
+softdepend: [Vault]
 commands:
   chunk:
     description: Claim and manage the current chunk.
-    usage: /chunk <claim|unclaim|trust|untrust|flag|info|visualize|admin>
+    usage: /chunk <claim|unclaim|trust|untrust|flag|info|progress|unlock|visualize|admin>
     aliases: [claim]
 permissions:
   chunklock.claim:
@@ -19,3 +20,9 @@ permissions:
   chunklock.admin:
     description: Use administrative claim commands.
     default: op
+  chunklock.progress:
+    description: View claim-unlock progression.
+    default: true
+  chunklock.unlock:
+    description: Unlock additional claim slots with objectives or currency.
+    default: true

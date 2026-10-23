@@ -3,6 +3,7 @@ package com.chunklock.storage;
 import com.chunklock.model.ChunkClaim;
 import com.chunklock.model.ChunkKey;
 import com.chunklock.model.ClaimFlag;
+import com.chunklock.model.PlayerProgress;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -43,12 +44,12 @@ public final class ClaimRepository implements AutoCloseable {
         this.databaseExecutor = Executors.newSingleThreadExecutor(factory);
     }
 
-    public CompletableFuture<List<ChunkClaim>> initializeAndLoad() {
+    public CompletableFuture<StoredData> initializeAndLoad() {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 openDataSource();
                 createSchema();
-                return loadClaims();
+                return new StoredData(loadClaims(), loadPlayerProgress());
             } catch (SQLException exception) {
                 throw new CompletionException(exception);
             }
@@ -79,6 +80,18 @@ public final class ClaimRepository implements AutoCloseable {
                     connection.rollback();
                     throw exception;
                 }
+            } catch (SQLException exception) {
+                throw new CompletionException(exception);
+            }
+        }, databaseExecutor);
+    }
+
+    public CompletableFuture<Void> saveProgress(PlayerProgress progress) {
+        PlayerProgress snapshot = progress.snapshot();
+        return CompletableFuture.runAsync(() -> {
+            try {
+                saveProgressSnapshot(snapshot);
+                progress.markPersisted(snapshot.revision());
             } catch (SQLException exception) {
                 throw new CompletionException(exception);
             }
@@ -151,6 +164,61 @@ public final class ClaimRepository implements AutoCloseable {
                       PRIMARY KEY (world_id, chunk_x, chunk_z, flag_name)
                     )
                     """);
+            statement.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS chunk_player_progress (
+                      player_id VARCHAR(36) NOT NULL PRIMARY KEY,
+                      unlocked_claims INTEGER NOT NULL,
+                      task_progress BIGINT NOT NULL
+                    )
+                    """);
+        }
+    }
+
+    private List<PlayerProgress> loadPlayerProgress() throws SQLException {
+        List<PlayerProgress> progress = new ArrayList<>();
+        try (Connection connection = requireDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("SELECT * FROM chunk_player_progress")) {
+            while (rows.next()) {
+                progress.add(new PlayerProgress(UUID.fromString(rows.getString("player_id")),
+                        rows.getInt("unlocked_claims"), rows.getLong("task_progress")));
+            }
+        }
+        return progress;
+    }
+
+    private void saveProgressSnapshot(PlayerProgress progress) throws SQLException {
+        try (Connection connection = requireDataSource().getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                int updated;
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        UPDATE chunk_player_progress
+                        SET unlocked_claims = ?, task_progress = ?
+                        WHERE player_id = ?
+                        """)) {
+                    statement.setInt(1, progress.unlockedClaims());
+                    statement.setLong(2, progress.taskProgress());
+                    statement.setString(3, progress.playerId().toString());
+                    updated = statement.executeUpdate();
+                }
+                if (updated == 0) {
+                    try (PreparedStatement statement = connection.prepareStatement("""
+                            INSERT INTO chunk_player_progress
+                            (player_id, unlocked_claims, task_progress)
+                            VALUES (?, ?, ?)
+                            """)) {
+                        statement.setString(1, progress.playerId().toString());
+                        statement.setInt(2, progress.unlockedClaims());
+                        statement.setLong(3, progress.taskProgress());
+                        statement.executeUpdate();
+                    }
+                }
+                connection.commit();
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            }
         }
     }
 

@@ -4,7 +4,9 @@ import com.chunklock.ChunkLockPlugin;
 import com.chunklock.model.ChunkClaim;
 import com.chunklock.model.ChunkKey;
 import com.chunklock.model.ClaimFlag;
+import com.chunklock.model.ProgressTask;
 import com.chunklock.service.ClaimService;
+import com.chunklock.service.ProgressionService;
 import org.bukkit.World;
 import org.bukkit.Location;
 import org.bukkit.Bukkit;
@@ -17,6 +19,7 @@ import org.bukkit.block.Container;
 import org.bukkit.block.data.type.Switch;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.block.Action;
@@ -24,6 +27,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
@@ -46,6 +50,7 @@ import static org.mockito.Mockito.*;
 class ProtectionListenerTest {
     private ChunkLockPlugin plugin;
     private ClaimService claims;
+    private ProgressionService progression;
     private ProtectionListener listener;
     private UUID worldId;
     private World world;
@@ -76,10 +81,12 @@ class ProtectionListenerTest {
     void setUp() {
         plugin = mock(ChunkLockPlugin.class);
         claims = mock(ClaimService.class);
+        progression = mock(ProgressionService.class);
         world = mock(World.class);
         worldId = UUID.randomUUID();
         ownerId = UUID.randomUUID();
         when(plugin.claims()).thenReturn(claims);
+        when(plugin.progression()).thenReturn(progression);
         when(world.getUID()).thenReturn(worldId);
         claim = ChunkClaim.create(new ChunkKey(worldId, 0, 0), ownerId);
         listener = new ProtectionListener(plugin);
@@ -94,6 +101,20 @@ class ProtectionListenerTest {
 
         assertTrue(event.isCancelled());
         verify(claims, never()).get(any());
+    }
+
+    @Test
+    void countsSurvivalBlockBreaksButNotProtectedBreakAttempts() {
+        when(claims.isReady()).thenReturn(true);
+        when(claims.get(any())).thenReturn(null);
+        Player player = player(UUID.randomUUID());
+        when(player.getGameMode()).thenReturn(org.bukkit.GameMode.SURVIVAL);
+        BlockBreakEvent event = new BlockBreakEvent(block(1, 1), player);
+
+        listener.onBlockBreak(event);
+
+        verify(progression).record(player.getUniqueId(), ProgressTask.BLOCKS, 1);
+        assertFalse(event.isCancelled());
     }
 
     @Test
@@ -269,6 +290,20 @@ class ProtectionListenerTest {
         CreatureSpawnEvent pluginSpawn = new CreatureSpawnEvent(mob, CreatureSpawnEvent.SpawnReason.CUSTOM);
         listener.onCreatureSpawn(pluginSpawn);
         assertFalse(pluginSpawn.isCancelled());
+    }
+
+    @Test
+    void countsHostileMobKillsForTheKiller() {
+        Monster monster = mock(Monster.class);
+        Player killer = player(UUID.randomUUID());
+        when(monster.getKiller()).thenReturn(killer);
+        when(killer.getGameMode()).thenReturn(org.bukkit.GameMode.SURVIVAL);
+        EntityDeathEvent event = mock(EntityDeathEvent.class);
+        when(event.getEntity()).thenReturn(monster);
+
+        listener.onEntityDeath(event);
+
+        verify(progression).record(killer.getUniqueId(), ProgressTask.HOSTILE_MOBS, 1);
     }
 
     @Test

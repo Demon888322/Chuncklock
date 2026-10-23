@@ -3,6 +3,7 @@ package com.chunklock.storage;
 import com.chunklock.model.ChunkClaim;
 import com.chunklock.model.ChunkKey;
 import com.chunklock.model.ClaimFlag;
+import com.chunklock.model.PlayerProgress;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.Test;
@@ -28,19 +29,21 @@ class ClaimRepositoryTest {
         UUID member = UUID.randomUUID();
         ChunkKey key = new ChunkKey(UUID.randomUUID(), -7, 11);
         try {
-            assertTrue(repository.initializeAndLoad().get(20, TimeUnit.SECONDS).isEmpty());
+            assertTrue(repository.initializeAndLoad().get(20, TimeUnit.SECONDS).claims().isEmpty());
             ChunkClaim claim = new ChunkClaim(key, owner, java.util.Set.of(member),
                     java.util.Map.of(ClaimFlag.PVP, true, ClaimFlag.CONTAINER_ACCESS, true), 123L, 456L);
 
             repository.save(claim).get(20, TimeUnit.SECONDS);
+            PlayerProgress progress = new PlayerProgress(owner, 3, 19L);
+            repository.saveProgress(progress).get(20, TimeUnit.SECONDS);
         } finally {
             repository.close();
         }
 
         ClaimRepository reloadedRepository = new ClaimRepository(plugin);
         try {
-            List<ChunkClaim> loadedClaims = reloadedRepository.initializeAndLoad()
-                    .get(20, TimeUnit.SECONDS);
+            var storedData = reloadedRepository.initializeAndLoad().get(20, TimeUnit.SECONDS);
+            List<ChunkClaim> loadedClaims = storedData.claims();
             assertEquals(1, loadedClaims.size());
             ChunkClaim loaded = loadedClaims.get(0);
             assertEquals(key, loaded.key());
@@ -51,6 +54,10 @@ class ClaimRepositoryTest {
             assertFalse(loaded.hasFlag(ClaimFlag.REDSTONE));
             assertEquals(123L, loaded.createdTimestamp());
             assertEquals(456L, loaded.lastOwnerLogin());
+            assertEquals(1, storedData.playerProgress().size());
+            assertEquals(owner, storedData.playerProgress().get(0).playerId());
+            assertEquals(3, storedData.playerProgress().get(0).unlockedClaims());
+            assertEquals(19L, storedData.playerProgress().get(0).taskProgress());
 
             reloadedRepository.delete(key).get(20, TimeUnit.SECONDS);
         } finally {
@@ -59,8 +66,9 @@ class ClaimRepositoryTest {
 
         ClaimRepository verificationRepository = new ClaimRepository(plugin);
         try {
-            assertTrue(verificationRepository.initializeAndLoad()
-                    .get(20, TimeUnit.SECONDS).isEmpty());
+            var storedData = verificationRepository.initializeAndLoad().get(20, TimeUnit.SECONDS);
+            assertTrue(storedData.claims().isEmpty());
+            assertEquals(1, storedData.playerProgress().size());
         } finally {
             verificationRepository.close();
         }

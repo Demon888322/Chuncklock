@@ -5,6 +5,7 @@ import com.chunklock.model.ChunkClaim;
 import com.chunklock.model.ChunkKey;
 import com.chunklock.model.ClaimFlag;
 import com.chunklock.service.ClaimService;
+import com.chunklock.service.ProgressionService;
 import com.chunklock.util.Messages;
 import com.chunklock.visual.ClaimVisualizer;
 import org.bukkit.Bukkit;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.*;
 class ChunkCommandTest {
     private ChunkLockPlugin plugin;
     private ClaimService claims;
+    private ProgressionService progression;
     private Messages messages;
     private ClaimVisualizer visualizer;
     private ChunkCommand command;
@@ -40,6 +42,7 @@ class ChunkCommandTest {
     void setUp() {
         plugin = mock(ChunkLockPlugin.class);
         claims = mock(ClaimService.class);
+        progression = mock(ProgressionService.class);
         messages = mock(Messages.class);
         visualizer = mock(ClaimVisualizer.class);
         player = mock(Player.class);
@@ -54,10 +57,21 @@ class ChunkCommandTest {
         config.set("claims.default-limit", 8);
 
         when(plugin.claims()).thenReturn(claims);
+        when(plugin.progression()).thenReturn(progression);
         when(plugin.messages()).thenReturn(messages);
         when(plugin.visualizer()).thenReturn(visualizer);
         when(plugin.getConfig()).thenReturn(config);
         when(claims.isReady()).thenReturn(true);
+        when(progression.claimLimit(any(), anyInt())).thenAnswer(invocation -> invocation.getArgument(1));
+        when(progression.isEnabled()).thenReturn(true);
+        when(progression.isReady()).thenReturn(true);
+        when(progression.tasksEnabled()).thenReturn(true);
+        when(progression.economyEnabled()).thenReturn(true);
+        when(progression.maximumClaims()).thenReturn(100);
+        when(progression.currentObjective(any())).thenReturn(
+                new ProgressionService.Objective(com.chunklock.model.ProgressTask.PLAYTIME, 15, 3));
+        when(progression.unlockWithTask(any())).thenReturn(ProgressionService.UnlockResult.SAVING);
+        when(progression.unlockWithMoney(any())).thenReturn(ProgressionService.UnlockResult.SAVING);
         when(claims.owns(any(), any())).thenAnswer(invocation -> {
             ChunkClaim claim = invocation.getArgument(0);
             UUID ownerId = invocation.getArgument(1);
@@ -193,5 +207,23 @@ class ChunkCommandTest {
             verify(messages).send(eq(player), eq("info-flags"), argThat(values ->
                     values.get("flags").contains("pvp=true")));
         }
+    }
+
+    @Test
+    void showsProgressAndRoutesBothUnlockMethods() {
+        command.onCommand(player, bukkitCommand, "chunk", new String[]{"progress"});
+        verify(messages).send(player, "progression-status", java.util.Map.of(
+                "claims", "8", "unlocked", "0", "maximum", "100"));
+        verify(messages).send(player, "progression-task", java.util.Map.of(
+                "task", "playtime", "progress", "3", "target", "15", "unit", "play minutes"));
+
+        command.onCommand(player, bukkitCommand, "chunk", new String[]{"unlock", "task"});
+        verify(progression).unlockWithTask(player);
+        verify(messages).send(player, "unlock-processing");
+
+        command.onCommand(player, bukkitCommand, "chunk", new String[]{"unlock", "money"});
+        verify(progression).unlockWithMoney(player);
+        assertEquals(List.of("task", "money"), command.onTabComplete(
+                player, bukkitCommand, "chunk", new String[]{"unlock", ""}));
     }
 }

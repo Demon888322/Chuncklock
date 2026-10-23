@@ -4,6 +4,7 @@ import com.chunklock.ChunkLockPlugin;
 import com.chunklock.model.ChunkClaim;
 import com.chunklock.model.ChunkKey;
 import com.chunklock.model.ClaimFlag;
+import com.chunklock.model.ProgressTask;
 import org.bukkit.Location;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
@@ -14,6 +15,7 @@ import org.bukkit.entity.Animals;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
+import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.Cancellable;
@@ -25,6 +27,7 @@ import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
@@ -50,6 +53,9 @@ public final class ProtectionListener implements Listener {
             return;
         }
         denyUnlessTrusted(event, key(event.getBlock()), event.getPlayer().getUniqueId());
+        if (!event.isCancelled() && event.getPlayer().getGameMode() == org.bukkit.GameMode.SURVIVAL) {
+            plugin.progression().record(event.getPlayer().getUniqueId(), ProgressTask.BLOCKS, 1);
+        }
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
@@ -186,6 +192,16 @@ public final class ProtectionListener implements Listener {
         ChunkClaim claim = plugin.claims().get(key(event.getLocation()));
         if (claim != null && !claim.hasFlag(ClaimFlag.MOB_SPAWNING)) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityDeath(EntityDeathEvent event) {
+        if (event.getEntity() instanceof Monster) {
+            Player killer = event.getEntity().getKiller();
+            if (killer != null && killer.getGameMode() == org.bukkit.GameMode.SURVIVAL) {
+                plugin.progression().record(killer.getUniqueId(), ProgressTask.HOSTILE_MOBS, 1);
+            }
         }
     }
 

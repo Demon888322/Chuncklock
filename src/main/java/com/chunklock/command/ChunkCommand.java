@@ -4,6 +4,7 @@ import com.chunklock.ChunkLockPlugin;
 import com.chunklock.model.ChunkClaim;
 import com.chunklock.model.ChunkKey;
 import com.chunklock.model.ClaimFlag;
+import com.chunklock.service.ProgressionService;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -22,7 +23,8 @@ import java.util.stream.Collectors;
 
 public final class ChunkCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS =
-            List.of("claim", "unclaim", "trust", "untrust", "flag", "info", "visualize", "admin");
+            List.of("claim", "unclaim", "trust", "untrust", "flag", "info",
+                    "progress", "unlock", "visualize", "admin");
     private final ChunkLockPlugin plugin;
 
     public ChunkCommand(ChunkLockPlugin plugin) {
@@ -56,6 +58,8 @@ public final class ChunkCommand implements CommandExecutor, TabCompleter {
             case "untrust" -> trust(player, key, args, false);
             case "flag" -> flag(player, key, args);
             case "info" -> info(player, key);
+            case "progress" -> progression(player);
+            case "unlock" -> unlock(player, args);
             case "visualize" -> plugin.visualizer().toggle(player);
             default -> plugin.messages().send(player, "usage");
         }
@@ -71,7 +75,7 @@ public final class ChunkCommand implements CommandExecutor, TabCompleter {
             plugin.messages().send(player, "already-claimed");
             return;
         }
-        int limit = getLimit(player);
+        int limit = plugin.progression().claimLimit(player.getUniqueId(), getLimit(player));
         if (plugin.claims().countOwned(player.getUniqueId()) >= limit) {
             plugin.messages().send(player, "claim-limit", Map.of("limit", Integer.toString(limit)));
             return;
@@ -211,6 +215,83 @@ public final class ChunkCommand implements CommandExecutor, TabCompleter {
         plugin.messages().send(player, "admin-unclaimed");
     }
 
+    private void progression(Player player) {
+        if (!player.hasPermission("chunklock.progress")) {
+            plugin.messages().send(player, "no-permission");
+            return;
+        }
+        ProgressionService progression = plugin.progression();
+        if (!progression.isEnabled()) {
+            plugin.messages().send(player, "progression-disabled");
+            return;
+        }
+        int limit = progression.claimLimit(player.getUniqueId(), getLimit(player));
+        plugin.messages().send(player, "progression-status", Map.of(
+                "claims", Integer.toString(limit),
+                "unlocked", Integer.toString(progression.unlockedClaims(player.getUniqueId())),
+                "maximum", Integer.toString(progression.maximumClaims())));
+        if (progression.tasksEnabled()) {
+            ProgressionService.Objective objective = progression.currentObjective(player.getUniqueId());
+            plugin.messages().send(player, "progression-task", Map.of(
+                    "task", objective.task().configName(),
+                    "progress", Long.toString(objective.progress()),
+                    "target", Long.toString(objective.target()),
+                    "unit", objective.task().description()));
+        }
+        if (!progression.economyEnabled()
+                && plugin.getConfig().getBoolean("progression.economy.enabled", true)) {
+            plugin.messages().send(player, "economy-unavailable");
+        }
+    }
+
+    private void unlock(Player player, String[] args) {
+        if (!player.hasPermission("chunklock.unlock")) {
+            plugin.messages().send(player, "no-permission");
+            return;
+        }
+        if (args.length != 2) {
+            plugin.messages().send(player, "unlock-usage");
+            return;
+        }
+        ProgressionService progression = plugin.progression();
+        if (!progression.isReady()) {
+            plugin.messages().send(player, "database-loading");
+            return;
+        }
+        if (!progression.isEnabled()) {
+            plugin.messages().send(player, "progression-disabled");
+            return;
+        }
+
+        ProgressionService.UnlockResult result;
+        if (args[1].equalsIgnoreCase("task")) {
+            result = progression.unlockWithTask(player);
+        } else if (args[1].equalsIgnoreCase("money")) {
+            result = progression.unlockWithMoney(player);
+        } else {
+            plugin.messages().send(player, "unlock-usage");
+            return;
+        }
+
+        switch (result) {
+            case SAVING -> plugin.messages().send(player, "unlock-processing");
+            case TASK_INCOMPLETE -> {
+                plugin.messages().send(player, "task-incomplete");
+                progression(player);
+            }
+            case TASKS_DISABLED -> plugin.messages().send(player, "tasks-disabled");
+            case ECONOMY_DISABLED -> plugin.messages().send(player, "economy-disabled");
+            case ECONOMY_UNAVAILABLE -> plugin.messages().send(player, "economy-unavailable");
+            case INSUFFICIENT_FUNDS -> plugin.messages().send(player, "insufficient-funds",
+                    Map.of("cost", progression.formatCurrency(
+                            plugin.getConfig().getDouble("progression.economy.cost-per-claim", 5000.0))));
+            case INVALID_COST -> plugin.messages().send(player, "economy-invalid-cost");
+            case MAXIMUM_REACHED -> plugin.messages().send(player, "maximum-claims");
+            case PENDING -> plugin.messages().send(player, "unlock-pending");
+            case NOT_READY -> plugin.messages().send(player, "database-loading");
+        }
+    }
+
     private int getLimit(Player player) {
         int defaultLimit = Math.max(0, plugin.getConfig().getInt("claims.default-limit", 8));
         if (!player.isPermissionSet("chunklock.claim")) {
@@ -265,6 +346,9 @@ public final class ChunkCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
             return partial(List.of("unclaim"), args[1]);
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("unlock")) {
+            return partial(List.of("task", "money"), args[1]);
         }
         return List.of();
     }
