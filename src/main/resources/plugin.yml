@@ -1,0 +1,21 @@
+name: ChunkLock
+version: '${project.version}'
+main: com.chunklock.ChunkLockPlugin
+api-version: '1.20'
+description: Lightweight chunk claims and protection for Paper.
+authors: [ChunkLock]
+commands:
+  chunk:
+    description: Claim and manage the current chunk.
+    usage: /chunk <claim|unclaim|trust|untrust|flag|info|visualize|admin>
+    aliases: [claim]
+permissions:
+  chunklock.claim:
+    description: Claim chunks and manage owned claims.
+    default: true
+  chunklock.flag:
+    description: Change flags on owned claims.
+    default: true
+  chunklock.admin:
+    description: Use administrative claim commands.
+    default: op

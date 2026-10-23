@@ -1,0 +1,38 @@
+package com.chunklock.util;
+
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import org.bukkit.command.CommandSender;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.configuration.file.YamlConfiguration;
+
+import java.io.File;
+import java.util.Map;
+
+public final class Messages {
+    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    private final JavaPlugin plugin;
+    private final YamlConfiguration messages;
+
+    public Messages(JavaPlugin plugin) {
+        this.plugin = plugin;
+        this.messages = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "messages.yml"));
+    }
+
+    public void send(CommandSender sender, String key) {
+        send(sender, key, Map.of());
+    }
+
+    public void send(CommandSender sender, String key, Map<String, String> placeholders) {
+        String prefix = messages.getString("prefix", "");
+        String message = messages.getString("messages." + key);
+        if (message == null) {
+            plugin.getLogger().warning("Missing message key: " + key);
+            return;
+        }
+        TagResolver.Builder resolver = TagResolver.builder();
+        placeholders.forEach((name, value) -> resolver.resolver(Placeholder.unparsed(name, value)));
+        sender.sendMessage(MINI_MESSAGE.deserialize(prefix + message, resolver.build()));
+    }
+}

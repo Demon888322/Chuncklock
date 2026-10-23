@@ -1,0 +1,27 @@
+storage:
+  type: sqlite
+  sqlite:
+    file: claims.db
+  mysql:
+    host: localhost
+    port: 3306
+    database: chunklock
+    username: chunklock
+    password: change-me
+    use-ssl: false
+  pool:
+    maximum-size: 4
+    connection-timeout-ms: 10000
+
+claims:
+  default-limit: 8
+  # Players with the matching permission receive that claim limit.
+  permission-limits:
+    5: chunklock.limit.5
+    20: chunklock.limit.20
+    50: chunklock.limit.50
+
+visualizer:
+  interval-ticks: 20
+  spacing: 2.0
+
